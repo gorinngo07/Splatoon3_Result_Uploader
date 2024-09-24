@@ -1,4 +1,4 @@
-name: Splatoon3 Battlelog Uploader
+name: Splatoon3 Result Uploader
 
 on:
   schedule:
