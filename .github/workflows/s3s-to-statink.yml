@@ -1,4 +1,4 @@
-name: Splatoon3 Result Uplorder
+name: Splatoon3 Battlelog Uploader
 
 on:
   schedule:
@@ -9,30 +9,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      API_KEY: ${{ secrets.API_KEY }}
-      ACC_LOC: ${{ secrets.ACC_LOC }}
-      GTOKEN: ${{ secrets.GTOKEN }}
-      BULLETTOKEN: ${{ secrets.BULLETTOKEN }}
-      SESSION_TOKEN: ${{ secrets.SESSION_TOKEN }}
-      F_GEN: ${{ secrets.F_GEN }}
+      CONFIG_TXT: ${{ secrets.CONFIG_TXT }}
 
-    name: Splatoon3 result Uploader
+    name: Upload BattleLogs
     steps:
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.11
-
       - name: Checkout frozenpandaman/s3s
         uses: actions/checkout@v3
         with:
           repository: 'frozenpandaman/s3s'
           path: s3s
-
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+          cache: 'pip'
+          cache-dependency-path: 's3s/requirements.txt'
       - name: Generate config.txt
         working-directory: s3s
         run: |
-          echo '{"api_key": "${{ env.API_KEY }}", "acc_loc": "${{ env.ACC_LOC }}", "gtoken": "${{ env.GTOKEN }}", "bullettoken": "${{ env.BULLETTOKEN }}", "session_token": "${{ env.SESSION_TOKEN }}", "f_gen": "${{ env.F_GEN }}" }' > config.txt
+          echo '${{ env.CONFIG_TXT }}' > config.txt
           cat config.txt
       - name: Install s3s requirements
         working-directory: s3s
