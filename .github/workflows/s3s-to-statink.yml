@@ -34,7 +34,6 @@ jobs:
         working-directory: s3s  # 作業ディレクトリをs3sに設定
         run: |
           echo '${{ env.CONFIG_TXT }}' > config.txt  # シークレットをconfig.txtに書き込む
-          # cat config.txt  # セキュリティの観点から削除：config.txtの内容を表示する行
 
       # s3sの依存パッケージをインストール
       - name: Install s3s requirements
