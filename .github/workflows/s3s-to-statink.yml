@@ -78,13 +78,13 @@ jobs:
         run: |
           # 新しいconfig.txtの内容を読み込み
           NEW_CONFIG=$(cat config.txt)
-          
+
           # リポジトリ名を取得
-          REPO_NAME=${{ github.repository }}
-          
+          REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
+
           # GitHubのSecretsを更新
           curl -X PUT \
-            -H "Authorization: token ${{ secrets.MY_GITHUB_PAT }}" \  # PATを使って認証
+            -H "Authorization: token $MY_GITHUB_PAT" \  # PATを使って認証
             -H "Accept: application/vnd.github.v3+json" \  # GitHub APIの形式に対応
-            https://api.github.com/repos/${REPO_NAME}/actions/secrets/CONFIG_TXT \  # CONFIG_TXTシークレットを更新
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token ${{ secrets.MY_GITHUB_PAT }}' https://api.github.com/repos/${REPO_NAME}/actions/secrets/public-key | jq -r .key_id)\"}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
+            "https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT" \  # CONFIG_TXTシークレットを更新
+            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
