@@ -35,6 +35,15 @@ jobs:
         run: |
           echo '${{ env.CONFIG_TXT }}' > config.txt  # シークレットをconfig.txtに書き込む
 
+      # トークンの末尾5文字をログに出力して確認
+      - name: Display last 5 characters of tokens
+        working-directory: s3s
+        run: |
+          echo "api_key: $(tail -c 5 <<< $(grep 'api_key' config.txt | awk -F'"' '{print $4}'))"
+          echo "gtoken: $(tail -c 5 <<< $(grep 'gtoken' config.txt | awk -F'"' '{print $4}'))"
+          echo "bullettoken: $(tail -c 5 <<< $(grep 'bullettoken' config.txt | awk -F'"' '{print $4}'))"
+          echo "session_token: $(tail -c 5 <<< $(grep 'session_token' config.txt | awk -F'"' '{print $4}'))"
+
       # s3sの依存パッケージをインストール
       - name: Install s3s requirements
         working-directory: s3s  # 作業ディレクトリをs3sに設定
