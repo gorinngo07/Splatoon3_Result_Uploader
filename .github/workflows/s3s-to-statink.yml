@@ -2,15 +2,15 @@ name: Splatoon3 Result Uploader
 
 on:
   schedule:
-    - cron: '0 0-23/2 * * *'  # 2時間ごとにスケジュール実行
-  workflow_dispatch:  # 手動トリガーを有効にする
+    - cron: '0 0-23/2 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Ubuntuの最新バージョンで実行
+    runs-on: ubuntu-latest
     env:
-      CONFIG_TXT: ${{ secrets.CONFIG_TXT }}  # GitHub Secretsから読み込むCONFIG_TXT
-      MY_GITHUB_PAT: ${{ secrets.MY_GITHUB_PAT }}  # シークレット更新用のPersonal Access Token (PAT)
+      CONFIG_TXT: ${{ secrets.CONFIG_TXT }}
+      MY_GITHUB_PAT: ${{ secrets.MY_GITHUB_PAT }} # シークレット更新用のPersonal Access Token (PAT)
 
     name: Upload BattleLogs
     steps:
@@ -18,73 +18,73 @@ jobs:
       - name: Checkout frozenpandaman/s3s
         uses: actions/checkout@v3
         with:
-          repository: 'frozenpandaman/s3s'  # チェックアウトするリポジトリ
-          path: s3s  # チェックアウト先のパス
+          repository: 'frozenpandaman/s3s'
+          path: s3s
 
       # Python 3.11のセットアップ
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11  # 使用するPythonのバージョン
-          cache: 'pip'  # pipのキャッシュを使用
-          cache-dependency-path: 's3s/requirements.txt'  # キャッシュの依存関係ファイル
+          python-version: 3.11
+          cache: 'pip'
+          cache-dependency-path: 's3s/requirements.txt'
 
       # シークレットから読み込んだCONFIG_TXTをconfig.txtとして保存
       - name: Generate config.txt
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        working-directory: s3s
         run: |
-          echo '${{ env.CONFIG_TXT }}' > config.txt  # CONFIG_TXTの内容をconfig.txtに書き込む
-          # cat config.txt  # セキュリティの観点からこの行を削除
+          echo '${{ env.CONFIG_TXT }}' > config.txt
+          cat config.txt
 
       # s3sの依存パッケージをインストール
       - name: Install s3s requirements
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        working-directory: s3s
         run: |
-          pip install -r requirements.txt  # requirements.txtに記載された依存パッケージをインストール
+          pip install -r requirements.txt
 
       # 実行前のconfig.txtのハッシュ値を保存
       - name: Save original config.txt hash
-        id: save_hash  # このステップのIDをsave_hashに設定
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        id: save_hash
+        working-directory: s3s
         run: |
-          original_hash=$(sha256sum config.txt | awk '{print $1}')  # config.txtのSHA-256ハッシュ値を計算
-          echo "::set-output name=original_hash::$original_hash"  # 計算したハッシュ値を出力として設定
+          original_hash=$(sha256sum config.txt | awk '{print $1}')
+          echo "::set-output name=original_hash::$original_hash"
 
       # s3sを実行し、バトルログをアップロード (必要に応じてトークンを再生成)
       - name: Run s3s
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        working-directory: s3s
         run: |
-          python3 s3s.py -r  # s3s.pyスクリプトを実行
+          python3 s3s.py -r
 
       # config.txtが更新されたかどうかを確認
       # 実行前のハッシュと実行後のハッシュを比較
       - name: Check if config.txt was updated
-        id: check_update  # このステップのIDをcheck_updateに設定
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        id: check_update
+        working-directory: s3s
         run: |
-          new_hash=$(sha256sum config.txt | awk '{print $1}')  # 新しいconfig.txtのSHA-256ハッシュ値を計算
-          if [ "$new_hash" != "${{ steps.save_hash.outputs.original_hash }}" ]; then  # ハッシュが異なる場合
-            echo "config.txtが更新されました。"  # 更新されたことをログに表示
-            echo "::set-output name=updated::true"  # 更新フラグをtrueに設定
+          new_hash=$(sha256sum config.txt | awk '{print $1}')
+          if [ "$new_hash" != "${{ steps.save_hash.outputs.original_hash }}" ]; then
+            echo "config.txtが更新されました。"
+            echo "::set-output name=updated::true"
           else
-            echo "config.txtは更新されていません。"  # 更新されていないことをログに表示
-            echo "::set-output name=updated::false"  # 更新フラグをfalseに設定
+            echo "config.txtは更新されていません。"
+            echo "::set-output name=updated::false"
           fi
 
       # config.txtが更新された場合のみ、GitHub Secretsを更新
       - name: Update GitHub Secrets with new config.txt (if updated)
-        if: steps.check_update.outputs.updated == 'true'  # config.txtが更新された場合のみ実行
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        if: steps.check_update.outputs.updated == 'true' # config.txtが更新された場合のみ実行
+        working-directory: s3s
         run: |
           # 新しいconfig.txtの内容をJSONとして読み込み
           NEW_CONFIG=$(jq -R . config.txt | tr -d '\n')  # 改行を削除して1行にする
 
           # リポジトリ名を取得
-          REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"  # 対象のリポジトリ名を設定
+          REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
 
           # GitHubのSecretsを更新
           curl -v -X PUT \
-            -H "Authorization: token $MY_GITHUB_PAT"  # 認証のためにPATをヘッダーに追加
-            -H "Accept: application/vnd.github.v3+json"  # GitHub APIのバージョンを指定
-            "https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT"  # Secretsの更新URL
-            -d "{\"encrypted_value\":$NEW_CONFIG, \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
+            -H "Authorization: token $MY_GITHUB_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT" \
+            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"
