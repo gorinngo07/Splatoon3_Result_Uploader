@@ -76,15 +76,16 @@ jobs:
         if: steps.check_update.outputs.updated == 'true' # config.txtが更新された場合のみ実行
         working-directory: s3s
         run: |
-          # 新しいconfig.txtの内容を読み込み
-          NEW_CONFIG=$(cat config.txt)
+          # 新しいconfig.txtの内容をJSONとして読み込み
+          NEW_CONFIG=$(jq -R . config.txt | tr -d '\n')  # 改行を削除して1行にする
 
           # リポジトリ名を取得
           REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
 
           # GitHubのSecretsを更新
-          curl -X PUT \
-            -H "Authorization: token $MY_GITHUB_PAT" \  # PATを使って認証
-            -H "Accept: application/vnd.github.v3+json" \  # GitHub APIの形式に対応
-            "https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT" \  # CONFIG_TXTシークレットを更新
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
+          curl -v -X PUT \
+            -H "Authorization: token $MY_GITHUB_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT" \
+            -d "{\"encrypted_value\":$NEW_CONFIG, \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"
+
