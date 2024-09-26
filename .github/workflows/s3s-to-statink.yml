@@ -84,8 +84,8 @@ jobs:
         if: steps.check_update.outputs.updated == 'true'
         working-directory: s3s
         run: |
-          # 新しいconfig.txtの内容をJSONとしてエンコード
-          NEW_CONFIG=$(jq -Rs . config.txt)  # jqでJSONエンコード
+          # 新しいconfig.txtの内容をBase64エンコード (改行や特殊文字を含むデータも処理可能)
+          NEW_CONFIG=$(base64 -w 0 config.txt)
 
           # リポジトリ名を取得
           REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
