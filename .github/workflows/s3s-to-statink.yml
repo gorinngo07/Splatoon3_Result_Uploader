@@ -87,4 +87,4 @@ jobs:
             -H "Authorization: token $MY_GITHUB_PAT"  # 認証のためにPATをヘッダーに追加
             -H "Accept: application/vnd.github.v3+json"  # GitHub APIのバージョンを指定
             "https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT"  # Secretsの更新URL
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
+            -d "{\"encrypted_value\":$NEW_CONFIG, \"key_id\":\"$(curl -H 'Authorization: token $MY_GITHUB_PAT' https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
