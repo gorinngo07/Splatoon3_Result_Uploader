@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CONFIG_TXT: ${{ secrets.CONFIG_TXT }}
-      GITHUB_PAT: ${{ secrets.GITHUB_PAT }} # シークレット更新用のPersonal Access Token (PAT)
+      MY_GITHUB_PAT: ${{ secrets.MY_GITHUB_PAT }} # シークレット更新用のPersonal Access Token (PAT)
 
     name: Upload BattleLogs
     steps:
@@ -84,7 +84,7 @@ jobs:
           
           # GitHubのSecretsを更新
           curl -X PUT \
-            -H "Authorization: token ${{ secrets.GITHUB_PAT }}" \  # PATを使って認証
+            -H "Authorization: token ${{ secrets.MY_GITHUB_PAT }}" \  # PATを使って認証
             -H "Accept: application/vnd.github.v3+json" \  # GitHub APIの形式に対応
             https://api.github.com/repos/${REPO_NAME}/actions/secrets/CONFIG_TXT \  # CONFIG_TXTシークレットを更新
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token ${{ secrets.GITHUB_PAT }}' https://api.github.com/repos/${REPO_NAME}/actions/secrets/public-key | jq -r .key_id)\"}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
+            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$(curl -H 'Authorization: token ${{ secrets.MY_GITHUB_PAT }}' https://api.github.com/repos/${REPO_NAME}/actions/secrets/public-key | jq -r .key_id)\"}"  # 新しいconfig.txtの内容と公開鍵を用いて更新
