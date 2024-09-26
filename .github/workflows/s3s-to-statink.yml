@@ -82,10 +82,6 @@ jobs:
           # リポジトリ名を取得
           REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
 
-          # 環境変数の確認
-          echo "REPO_NAME: $REPO_NAME"
-          echo "MY_GITHUB_PAT: $MY_GITHUB_PAT"
-
           # GitHubのSecretsを更新
           curl -X PUT \
             -H "Authorization: token $MY_GITHUB_PAT" \  # PATを使って認証
