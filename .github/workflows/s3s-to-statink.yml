@@ -10,67 +10,50 @@ jobs:
     runs-on: ubuntu-latest  # Ubuntuの最新環境でジョブを実行
     env:
       CONFIG_TXT: ${{ secrets.CONFIG_TXT }}  # GitHub Secretsから取得した設定内容
-      MY_GITHUB_PAT: ${{ secrets.MY_GITHUB_PAT }} # シークレット更新用のPersonal Access Token (PAT)
+      MY_GITHUB_PAT: ${{ secrets.MY_GITHUB_PAT }}  # シークレット更新用のPersonal Access Token (PAT)
 
     name: Upload BattleLogs  # ジョブの名前
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # リポジトリをチェックアウト
 
-      # Node.js のセットアップ
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'  # 使用するNode.jsのバージョン
-
-      # frozenpandaman/s3sのリポジトリをチェックアウト
       - name: Checkout frozenpandaman/s3s
-        uses: actions/checkout@v3
+        uses: actions/checkout@v3  # frozenpandaman/s3sリポジトリをチェックアウト
         with:
           repository: 'frozenpandaman/s3s'  # チェックアウトするリポジトリの指定
           path: s3s  # リポジトリをチェックアウトするパス
 
-      # Python 3.11のセットアップ
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v4  # Python 3.11のセットアップ
         with:
           python-version: 3.11  # 使用するPythonのバージョン
           cache: 'pip'  # pipのキャッシュを有効にする
           cache-dependency-path: 's3s/requirements.txt'  # 依存関係のキャッシュ用のパス
 
-      # シークレットから読み込んだCONFIG_TXTをconfig.txtとして保存
       - name: Generate config.txt
-        working-directory: s3s
+        working-directory: s3s  # 作業ディレクトリを設定
         run: |
           echo '${{ env.CONFIG_TXT }}' > config.txt  # シークレットをconfig.txtに書き込む
 
-      # s3sの依存パッケージをインストール
       - name: Install s3s requirements
-        working-directory: s3s
+        working-directory: s3s  # 作業ディレクトリを設定
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.txt  # s3sの依存パッケージをインストール
 
-      # s3sを実行し、バトルログをアップロード (必要に応じてトークンを再生成)
       - name: Run s3s
-        working-directory: s3s
+        working-directory: s3s  # 作業ディレクトリを設定
         run: |
-          python3 s3s.py -r
+          python3 s3s.py -r  # s3sを実行し、バトルログをアップロード
 
-      # config.txtが更新された場合のみ、GitHub Secretsを更新
       - name: Update GitHub Secrets with new config.txt (if updated)
-        if: ${{ steps.check_update.outputs.updated == 'true' }}
+        if: ${{ steps.check_update.outputs.updated == 'true' }}  # config.txtが更新された場合に実行
         run: |
           echo "Updating GitHub Secrets..."
 
-          # 必要なモジュールをインポート
+          # 必要なモジュールをインストール
           npm install axios tweetsodium @actions/core
 
-          const axios = require('axios');
-          const sodium = require('tweetsodium');
-          const fs = require('fs');
-          const core = require('@actions/core');
-
-          // GitHub パーソナルアクセストークン
+          # GitHub パーソナルアクセストークン
           const GITHUB_PAT = process.env.MY_GITHUB_PAT;
 
           // シークレットを設定するリポジトリ情報
@@ -79,67 +62,71 @@ jobs:
 
           // シークレットの名前とその値
           const SECRET_NAME = "CONFIG_TXT";
-          const SECRET_FILE_PATH = 's3s/config.txt';  // ファイルパスを指定
+          const SECRET_FILE_PATH = 's3s/config.txt';  # ファイルパスを指定
 
+          // GitHubの公開鍵を取得する関数
           async function getPublicKey() {
             try {
               const response = await axios.get(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/secrets/public-key`, {
                 headers: {
-                  Authorization: `Bearer ${GITHUB_PAT}`,
+                  Authorization: `Bearer ${GITHUB_PAT}`,  # 認証用トークン
                   Accept: 'application/vnd.github.v3+json'
                 }
               });
-              return { key: response.data.key, key_id: response.data.key_id };
+              return { key: response.data.key, key_id: response.data.key_id };  # 公開鍵とIDを返す
             } catch (error) {
-              core.error("公開鍵の取得に失敗しました: " + error.message);
+              core.error("公開鍵の取得に失敗しました: " + error.message);  # エラーメッセージ
               if (error.response) {
                 core.error(`レスポンスデータ: ${JSON.stringify(error.response.data)}`);
                 core.error(`レスポンスステータス: ${error.response.status}`);
               }
-              process.exit(1);
+              process.exit(1);  # エラー発生時は終了
             }
           }
 
+          // シークレットを暗号化する関数
           function encryptSecret(publicKey, secretValue) {
-            const key = Buffer.from(publicKey, 'base64');
-            const value = Buffer.from(secretValue);
-            const encryptedBytes = sodium.seal(value, key);
-            return Buffer.from(encryptedBytes).toString('base64');
+            const key = Buffer.from(publicKey, 'base64');  # 公開鍵をBase64からデコード
+            const value = Buffer.from(secretValue);  # シークレット値をバッファに変換
+            const encryptedBytes = sodium.seal(value, key);  # 公開鍵でシークレットを暗号化
+            return Buffer.from(encryptedBytes).toString('base64');  # 暗号化された値をBase64エンコードして返す
           }
 
+          // シークレットをGitHubに送信する関数
           async function createOrUpdateSecret(keyId, encryptedValue) {
             try {
               const response = await axios.put(
                 `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/secrets/${SECRET_NAME}`,
-                { encrypted_value: encryptedValue, key_id: keyId },
+                { encrypted_value: encryptedValue, key_id: keyId },  # 送信するデータ
                 {
                   headers: {
-                    Authorization: `Bearer ${GITHUB_PAT}`,
+                    Authorization: `Bearer ${GITHUB_PAT}`,  # 認証用トークン
                     Accept: 'application/vnd.github.v3+json'
                   }
                 }
               );
-              core.info(`${SECRET_NAME} が正常に作成または更新されました`);
-              core.info(`Response status: ${response.status}`);
+              core.info(`${SECRET_NAME} が正常に作成または更新されました`);  # 成功メッセージ
+              core.info(`Response status: ${response.status}`);  # レスポンスステータス
             } catch (error) {
-              core.error("シークレットの作成または更新に失敗しました: " + error.message);
+              core.error("シークレットの作成または更新に失敗しました: " + error.message);  # エラーメッセージ
               if (error.response) {
                 core.error(`レスポンスデータ: ${JSON.stringify(error.response.data)}`);
                 core.error(`レスポンスステータス: ${error.response.status}`);
               }
-              process.exit(1);
+              process.exit(1);  # エラー発生時は終了
             }
           }
 
+          // メイン処理
           (async () => {
             try {
-              const { key, key_id } = await getPublicKey();
-              const secretValue = fs.readFileSync(SECRET_FILE_PATH, 'utf-8');
-              core.info("シークレットの内容を読み込みました");
-              const encryptedValue = encryptSecret(key, secretValue);
-              await createOrUpdateSecret(key_id, encryptedValue);
+              const { key, key_id } = await getPublicKey();  # 公開鍵を取得
+              const secretValue = fs.readFileSync(SECRET_FILE_PATH, 'utf-8');  # シークレットの内容を読み込み
+              core.info("シークレットの内容を読み込みました");  # 成功メッセージ
+              const encryptedValue = encryptSecret(key, secretValue);  # シークレットを暗号化
+              await createOrUpdateSecret(key_id, encryptedValue);  # GitHubにシークレットを送信
             } catch (error) {
-              core.setFailed(`エラーが発生しました: ${error.message}`);
+              core.setFailed(`エラーが発生しました: ${error.message}`);  # エラーメッセージ
               if (error.response) {
                 core.error(`レスポンスデータ: ${JSON.stringify(error.response.data)}`);
                 core.error(`レスポンスステータス: ${error.response.status}`);
