@@ -94,13 +94,27 @@ jobs:
           PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r .key)
           KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r .key_id)
 
-          # 公開鍵を使用してシークレットを暗号化
+          # 公開鍵を保存
           echo "$PUBLIC_KEY" | base64 -d > publickey.pem
-          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl pkeyutl -encrypt -pubin -inkey publickey.pem | base64 -w 0)
+
+          # 公開鍵の内容を確認
+          if [ ! -s publickey.pem ]; then
+            echo "公開鍵の取得に失敗しました"
+            exit 1
+          fi
+
+          # 公開鍵を使用してシークレットを暗号化
+          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl rsautl -encrypt -pubin -inkey publickey.pem | base64 -w 0)
 
           # GitHub Secretsを更新
-          curl -X PUT \
+          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X PUT \
             -H "Authorization: token $MY_GITHUB_PAT" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT \
-            -d "{\"encrypted_value\":\"$ENCRYPTED_CONFIG\", \"key_id\":\"$KEY_ID\"}"
+            -d "{\"encrypted_value\":\"$ENCRYPTED_CONFIG\", \"key_id\":\"$KEY_ID\"}")
+
+          if [ "$RESPONSE" -ne 200 ]; then
+            echo "シークレットの更新に失敗しました"
+            cat response.json
+            exit 1
+          fi
