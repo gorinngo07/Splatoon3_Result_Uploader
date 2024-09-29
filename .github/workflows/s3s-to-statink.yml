@@ -94,8 +94,9 @@ jobs:
           PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r .key)
           KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r .key_id)
 
-          # 公開鍵を使ってシークレットを暗号化
-          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl rsautl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64 | tr -d '\n')
+          # 公開鍵を使用してシークレットを暗号化
+          echo "$PUBLIC_KEY" | base64 -d > publickey.pem
+          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl pkeyutl -encrypt -pubin -inkey publickey.pem | base64 -w 0)
 
           # GitHub Secretsを更新
           curl -X PUT \
