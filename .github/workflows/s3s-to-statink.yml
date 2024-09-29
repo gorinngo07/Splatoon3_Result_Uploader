@@ -61,4 +61,5 @@ jobs:
         if: ${{ steps.check_update.outputs.updated == 'true' }}
         working-directory: s3s
         run: |
+          set -x
           node ../update_secrets.js config.txt
