@@ -14,6 +14,15 @@ jobs:
 
     name: Upload BattleLogs  # ジョブの名前
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # Node.js のセットアップ
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'  # 使用するNode.jsのバージョン
+
       # frozenpandaman/s3sのリポジトリをチェックアウト
       - name: Checkout frozenpandaman/s3s
         uses: actions/checkout@v3
@@ -31,74 +40,25 @@ jobs:
 
       # シークレットから読み込んだCONFIG_TXTをconfig.txtとして保存
       - name: Generate config.txt
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        working-directory: s3s
         run: |
           echo '${{ env.CONFIG_TXT }}' > config.txt  # シークレットをconfig.txtに書き込む
 
-      # トークンの末尾5文字をログに出力して確認
-      - name: Display last 5 characters of tokens
-        working-directory: s3s
-        run: |
-          echo "api_key: $(tail -c 5 <<< $(grep 'api_key' config.txt | awk -F'"' '{print $4}'))"
-          echo "gtoken: $(tail -c 5 <<< $(grep 'gtoken' config.txt | awk -F'"' '{print $4}'))"
-          echo "bullettoken: $(tail -c 5 <<< $(grep 'bullettoken' config.txt | awk -F'"' '{print $4}'))"
-          echo "session_token: $(tail -c 5 <<< $(grep 'session_token' config.txt | awk -F'"' '{print $4}'))"
-
       # s3sの依存パッケージをインストール
       - name: Install s3s requirements
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        working-directory: s3s
         run: |
-          pip install -r requirements.txt  # requirements.txtに基づいて依存パッケージをインストール
-
-      # 実行前のconfig.txtのハッシュ値を保存
-      - name: Save original config.txt hash
-        id: save_hash
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
-        run: |
-          original_hash=$(sha256sum config.txt | awk '{print $1}')  # config.txtのSHA256ハッシュを計算
-          echo "::set-output name=original_hash::$original_hash"  # ハッシュを出力に設定
+          pip install -r requirements.txt
 
       # s3sを実行し、バトルログをアップロード (必要に応じてトークンを再生成)
       - name: Run s3s
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
+        working-directory: s3s
         run: |
-          python3 s3s.py -r  # s3s.pyスクリプトを実行
-
-      # config.txtが更新されたかどうかを確認
-      # 実行前のハッシュと実行後のハッシュを比較
-      - name: Check if config.txt was updated
-        id: check_update
-        working-directory: s3s  # 作業ディレクトリをs3sに設定
-        run: |
-          new_hash=$(sha256sum config.txt | awk '{print $1}')  # 新しいconfig.txtのSHA256ハッシュを計算
-          if [ "$new_hash" != "${{ steps.save_hash.outputs.original_hash }}" ]; then
-            echo "config.txtが更新されました。"  # 更新があった場合のメッセージ
-            echo "::set-output name=updated::true"  # 更新フラグを設定
-          else
-            echo "config.txtは更新されていません。"  # 更新がなかった場合のメッセージ
-            echo "::set-output name=updated::false"  # 更新フラグを設定
-          fi
+          python3 s3s.py -r
 
       # config.txtが更新された場合のみ、GitHub Secretsを更新
       - name: Update GitHub Secrets with new config.txt (if updated)
-        if: steps.check_update.outputs.updated == 'true'
+        if: ${{ steps.check_update.outputs.updated == 'true' }}
         working-directory: s3s
         run: |
-          # 新しいconfig.txtの内容をBase64エンコード (改行や特殊文字を含むデータも処理可能)
-          NEW_CONFIG=$(base64 -w 0 config.txt)
-
-          # リポジトリ名を取得
-          REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
-
-          # 公開鍵IDを取得
-          KEY_ID=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)
-
-          # リクエストボディの構造を確認
-          echo "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$KEY_ID\"}"
-
-          # GitHub Secretsを更新
-          curl -X PUT \
-            -H "Authorization: token $MY_GITHUB_PAT" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT \
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$KEY_ID\"}"
+          node ../update_secrets.js config.txt
