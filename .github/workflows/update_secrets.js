@@ -1,6 +1,7 @@
 const axios = require('axios');
 const sodium = require('tweetsodium');
 const fs = require('fs');
+const core = require('@actions/core'); // @actions/core モジュールをインポート
 
 // GitHub パーソナルアクセストークン
 const GITHUB_PAT = process.env.MY_GITHUB_PAT;
@@ -28,7 +29,11 @@ async function getPublicKey() {
       key_id: response.data.key_id
     };
   } catch (error) {
-    console.error("公開鍵の取得に失敗しました:", error.message);
+    core.error("公開鍵の取得に失敗しました: " + error.message);
+    if (error.response) {
+      core.error(`レスポンスデータ: ${JSON.stringify(error.response.data)}`);
+      core.error(`レスポンスステータス: ${error.response.status}`);
+    }
     process.exit(1);
   }
 }
@@ -62,35 +67,47 @@ async function createOrUpdateSecret(keyId, encryptedValue) {
       }
     );
 
-    console.log(`${SECRET_NAME} が正常に作成または更新されました`);
-    console.log(`Response status: ${response.status}`);
+    core.info(`${SECRET_NAME} が正常に作成または更新されました`);
+    core.info(`Response status: ${response.status}`);
   } catch (error) {
-    console.error("シークレットの作成または更新に失敗しました:", error.response ? error.response.data : error.message);
+    core.error("シークレットの作成または更新に失敗しました: " + error.message);
+    if (error.response) {
+      core.error(`レスポンスデータ: ${JSON.stringify(error.response.data)}`);
+      core.error(`レスポンスステータス: ${error.response.status}`);
+    }
     process.exit(1);
   }
 }
 
 // メイン処理
 (async () => {
-  // 1. 公開鍵を取得
-  console.log("公開鍵を取得しています...");
-  const { key, key_id } = await getPublicKey();
-  console.log("公開鍵の取得に成功しました");
+  try {
+    // 1. 公開鍵を取得
+    core.info("公開鍵を取得しています...");
+    const { key, key_id } = await getPublicKey();
+    core.info("公開鍵の取得に成功しました");
 
-  // 2. シークレットの内容を読み込み
-  console.log("シークレットの内容を読み込んでいます...");
-  const secretValue = fs.readFileSync(SECRET_FILE_PATH, 'utf-8');
-  console.log("シークレットの内容を読み込みました");
+    // 2. シークレットの内容を読み込み
+    core.info("シークレットの内容を読み込んでいます...");
+    const secretValue = fs.readFileSync(SECRET_FILE_PATH, 'utf-8');
+    core.info("シークレットの内容を読み込みました");
 
-  // シークレットの末尾5文字を表示
-  console.log(`更新するシークレットの末尾5文字: ${secretValue.slice(-5)}`);
+    // シークレットの末尾5文字を表示
+    core.info(`更新するシークレットの末尾5文字: ${secretValue.slice(-5)}`);
 
-  // 3. シークレットを暗号化
-  console.log("シークレットを暗号化しています...");
-  const encryptedValue = encryptSecret(key, secretValue);
-  console.log("シークレットの暗号化が完了しました");
+    // 3. シークレットを暗号化
+    core.info("シークレットを暗号化しています...");
+    const encryptedValue = encryptSecret(key, secretValue);
+    core.info("シークレットの暗号化が完了しました");
 
-  // 4. シークレットをGitHubに送信
-  console.log("GitHubにシークレットを送信しています...");
-  await createOrUpdateSecret(key_id, encryptedValue);
+    // 4. シークレットをGitHubに送信
+    core.info("GitHubにシークレットを送信しています...");
+    await createOrUpdateSecret(key_id, encryptedValue);
+  } catch (error) {
+    core.setFailed(`エラーが発生しました: ${error.message}`);
+    if (error.response) {
+      core.error(`レスポンスデータ: ${JSON.stringify(error.response.data)}`);
+      core.error(`レスポンスステータス: ${error.response.status}`);
+    }
+  }
 })();
