@@ -48,7 +48,7 @@ function encryptSecret(publicKey, secretValue) {
 // シークレットをGitHubに送信する関数
 async function createOrUpdateSecret(keyId, encryptedValue) {
   try {
-    await axios.put(
+    const response = await axios.put(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/secrets/${SECRET_NAME}`,
       {
         encrypted_value: encryptedValue,
@@ -63,8 +63,9 @@ async function createOrUpdateSecret(keyId, encryptedValue) {
     );
 
     console.log(`${SECRET_NAME} が正常に作成または更新されました`);
+    console.log(`Response status: ${response.status}`);
   } catch (error) {
-    console.error("シークレットの作成または更新に失敗しました:", error.response.data);
+    console.error("シークレットの作成または更新に失敗しました:", error.response ? error.response.data : error.message);
     process.exit(1);
   }
 }
@@ -72,14 +73,24 @@ async function createOrUpdateSecret(keyId, encryptedValue) {
 // メイン処理
 (async () => {
   // 1. 公開鍵を取得
+  console.log("公開鍵を取得しています...");
   const { key, key_id } = await getPublicKey();
+  console.log("公開鍵の取得に成功しました");
 
   // 2. シークレットの内容を読み込み
+  console.log("シークレットの内容を読み込んでいます...");
   const secretValue = fs.readFileSync(SECRET_FILE_PATH, 'utf-8');
+  console.log("シークレットの内容を読み込みました");
+
+  // シークレットの末尾5文字を表示
+  console.log(`更新するシークレットの末尾5文字: ${secretValue.slice(-5)}`);
 
   // 3. シークレットを暗号化
+  console.log("シークレットを暗号化しています...");
   const encryptedValue = encryptSecret(key, secretValue);
+  console.log("シークレットの暗号化が完了しました");
 
   // 4. シークレットをGitHubに送信
+  console.log("GitHubにシークレットを送信しています...");
   await createOrUpdateSecret(key_id, encryptedValue);
 })();
