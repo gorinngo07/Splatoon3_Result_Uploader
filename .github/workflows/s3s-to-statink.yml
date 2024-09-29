@@ -78,26 +78,49 @@ jobs:
             echo "updated=false" >> $GITHUB_ENV
           fi
 
-      # config.txtが更新された場合のみ、GitHub Secretsを更新
-      - name: Update GitHub Secrets with new config.txt (if updated)
-        if: env.updated == 'true'
-        working-directory: s3s
-        run: |
-          # 新しいconfig.txtの内容をそのまま利用
-          NEW_CONFIG=$(cat config.txt)
+            # config.txtが更新された場合のみ、GitHub Secretsを更新
+            - name: Update GitHub Secrets with new config.txt (if updated)
+              if: env.updated == 'true'
+              working-directory: s3s
+              run: |
+                # 新しいconfig.txtの内容をBase64エンコード
+                NEW_CONFIG=$(cat config.txt | base64 -w 0)
 
-          # リポジトリ名を取得
-          REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
+                # リポジトリ名を取得
+                REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
 
-          # GitHub Secretsを更新
-          RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X PUT \
-            -H "Authorization: token $MY_GITHUB_PAT" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT \
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$KEY_ID\"}")
+                # 公開鍵とキーIDを取得
+                PUBLIC_KEY_RESPONSE=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key)
+                PUBLIC_KEY=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r .key)
+                KEY_ID=$(echo "$PUBLIC_KEY_RESPONSE" | jq -r .key_id)
 
-          if [ "$RESPONSE" -ne 200 ]; then
-            echo "シークレットの更新に失敗しました"
-            cat response.json
-            exit 1
-          fi
+                # 公開鍵を保存
+                echo "$PUBLIC_KEY" > publickey.pem
+
+                # 公開鍵の内容を確認
+                if [ ! -s publickey.pem ]; then
+                  echo "公開鍵の取得に失敗しました"
+                  exit 1
+                fi
+
+                # 公開鍵を使用してシークレットを暗号化
+                ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl pkeyutl -encrypt -pubin -inkey publickey.pem | base64 -w 0)
+
+                # GitHub Secretsを更新
+                RESPONSE=$(curl -s -o response.json -w "%{http_code}" -X PUT \
+                  -H "Authorization: token $MY_GITHUB_PAT" \
+                  -H "Accept: application/vnd.github.v3+json" \
+                  https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT \
+                  -d "{\"encrypted_value\":\"$ENCRYPTED_CONFIG\", \"key_id\":\"$KEY_ID\"}")
+ 
+                if [ "$RESPONSE" -ne 200 ]; then
+                  echo "シークレットの更新に失敗しました"
+                  cat response.json
+                  exit 1
+                fi
+
+                if [ "$RESPONSE" -ne 200 ]; then
+                  echo "シークレットの更新に失敗しました"
+                  cat response.json
+                  exit 1
+                fi
