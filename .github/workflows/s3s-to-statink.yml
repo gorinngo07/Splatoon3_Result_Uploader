@@ -65,7 +65,6 @@ jobs:
           python3 s3s.py -r
 
       # config.txtが更新されたかどうかを確認
-      # 実行前のハッシュと実行後のハッシュを比較
       - name: Check if config.txt was updated
         id: check_update
         working-directory: s3s
@@ -73,15 +72,15 @@ jobs:
           new_hash=$(sha256sum config.txt | awk '{print $1}')
           if [ "$new_hash" != "${{ steps.save_hash.outputs.original_hash }}" ]; then
             echo "config.txtが更新されました。"
-            echo "::set-output name=updated::true"
+            echo "updated=true" >> $GITHUB_ENV
           else
             echo "config.txtは更新されていません。"
-            echo "::set-output name=updated::false"
+            echo "updated=false" >> $GITHUB_ENV
           fi
 
       # config.txtが更新された場合のみ、GitHub Secretsを更新
       - name: Update GitHub Secrets with new config.txt (if updated)
-        if: steps.check_update.outputs.updated == 'true'
+        if: env.updated == 'true'
         working-directory: s3s
         run: |
           # 新しいconfig.txtの内容をBase64エンコード
@@ -94,17 +93,12 @@ jobs:
           PUBLIC_KEY=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key)
           KEY_ID=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)
 
-    # 新しいconfig.txtを公開鍵で暗号化
-    ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl rsautl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64 | tr -d '\n')
+          # 新しいconfig.txtを公開鍵で暗号化
+          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl rsautl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64 | tr -d '\n')
 
-    # GitHub Secretsを更新
-    curl -X PUT \
-      -H "Authorization: token $MY_GITHUB_PAT" \
-      -H "Accept: application/vnd.github.v3+json" \
-      https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT \
-      -d "{\"encrypted_value\":\"$ENCRYPTED_CONFIG\", \"key_id\":\"$KEY_ID\"}"
-
+          # GitHub Secretsを更新
+          curl -X PUT \
             -H "Authorization: token $MY_GITHUB_PAT" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/$REPO_NAME/actions/secrets/CONFIG_TXT \
-            -d "{\"encrypted_value\":\"$NEW_CONFIG\", \"key_id\":\"$KEY_ID\"}"
+            -d "{\"encrypted_value\":\"$ENCRYPTED_CONFIG\", \"key_id\":\"$KEY_ID\"}"
