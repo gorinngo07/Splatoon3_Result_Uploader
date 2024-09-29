@@ -94,7 +94,7 @@ jobs:
           KEY_ID=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)
 
           # 新しいconfig.txtを公開鍵で暗号化
-          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl rsautl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64 | tr -d '\n')
+          ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl pkeyutl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY" | base64 -d) | base64 | tr -d '\n')
 
           # GitHub Secretsを更新
           curl -X PUT \
