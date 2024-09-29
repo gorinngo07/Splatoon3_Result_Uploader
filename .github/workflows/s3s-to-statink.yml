@@ -80,7 +80,7 @@ jobs:
 
       # config.txtが更新された場合のみ、GitHub Secretsを更新
       - name: Update GitHub Secrets with new config.txt (if updated)
-        if: steps.check_update.outputs.updated == 'true'
+        if: env.updated == 'true'
         working-directory: s3s
         run: |
           # 新しいconfig.txtの内容をBase64エンコード
@@ -90,13 +90,20 @@ jobs:
           REPO_NAME="gorinngo07/Splatoon3_Result_Uploader"
 
           # 公開鍵を取得
+          PUBLIC_KEY=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key)
           KEY_ID=$(curl -H "Authorization: token $MY_GITHUB_PAT" https://api.github.com/repos/$REPO_NAME/actions/secrets/public-key | jq -r .key_id)
 
           # 公開鍵を表示して確認
           echo "Public Key: $PUBLIC_KEY"
 
+          # 公開鍵をBase64デコードしてPEM形式に変換
+          PUBLIC_KEY_DECODED=$(echo "$PUBLIC_KEY" | base64 -d)
+
           # 新しいconfig.txtを公開鍵で暗号化
           ENCRYPTED_CONFIG=$(echo -n "$NEW_CONFIG" | openssl pkeyutl -encrypt -pubin -inkey <(echo "$PUBLIC_KEY_DECODED") | base64 | tr -d '\n')
+
+          # 暗号化された内容を表示して確認
+          echo "Encrypted Config: $ENCRYPTED_CONFIG"
 
           # GitHub Secretsを更新
           curl -X PUT \
